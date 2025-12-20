@@ -1,14 +1,16 @@
 using CounterStrikeSharp.API.Core;
+using SpectatorList.Models;
 
 namespace SpectatorList.Services
 {
     public interface IStorageService
     {
         Task<bool> InitializeAsync();
-        bool IsPlayerDisplayEnabled(CCSPlayerController player);
-        Task<bool> IsPlayerDisplayEnabledAsync(CCSPlayerController player);
-        void TogglePlayerDisplay(CCSPlayerController player);
-        Task TogglePlayerDisplayAsync(CCSPlayerController player);
+        Task<PlayerDisplayPreferences> GetPlayerPreferencesAsync(CCSPlayerController player);
+        PlayerDisplayPreferences GetPlayerPreferences(CCSPlayerController player);
+        Task<PlayerDisplayPreferences> TogglePlayerDisplayAsync(CCSPlayerController player);
+        PlayerDisplayPreferences TogglePlayerDisplay(CCSPlayerController player);
+        Task SetPlayerPreferencesAsync(CCSPlayerController player, PlayerDisplayPreferences preferences);
         void OnPlayerDisconnect(CCSPlayerController player);
         void ClearCache();
         string GetStorageType();

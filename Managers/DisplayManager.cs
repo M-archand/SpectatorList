@@ -1,10 +1,10 @@
 using CounterStrikeSharp.API;
 using CounterStrikeSharp.API.Core;
 using CounterStrikeSharp.API.Modules.Admin;
-using CounterStrikeSharp.API.Modules.Utils;
 
 using SpectatorList.Configs;
 using SpectatorList.Display;
+using SpectatorList.Models;
 using SpectatorList.Services;
 
 namespace SpectatorList.Managers
@@ -25,7 +25,7 @@ namespace SpectatorList.Managers
             _centerDisplays = new Dictionary<int, CenterMessageDisplay>();
             _screenDisplays = new Dictionary<int, ScreenViewDisplay>();
 
-            _ = InitializeStorageAsync();
+            Server.NextFrame(() => _ = InitializeStorageAsync());
         }
 
         private async Task InitializeStorageAsync()
@@ -57,11 +57,11 @@ namespace SpectatorList.Managers
             }
         }
 
-        public async Task<bool> IsPlayerDisplayEnabledAsync(CCSPlayerController player)
+        public async Task<PlayerDisplayPreferences> GetPlayerPreferencesAsync(CCSPlayerController player)
         {
             try
             {
-                return await _storageService.IsPlayerDisplayEnabledAsync(player);
+                return await _storageService.GetPlayerPreferencesAsync(player);
             }
             catch (Exception ex)
             {
@@ -70,25 +70,25 @@ namespace SpectatorList.Managers
 
                 Server.NextFrame(() =>
                 {
-                    Server.PrintToConsole($"[SpectatorList] Error checking display status for {playerName}: {errorMessage}");
+                    Server.PrintToConsole($"[SpectatorList] Error loading preferences for {playerName}: {errorMessage}");
                 });
-                return true;
+                return PlayerDisplayPreferences.FromDefaults(_config.Display);
             }
         }
 
-        public bool IsPlayerDisplayEnabled(CCSPlayerController player)
+        public PlayerDisplayPreferences GetPlayerPreferences(CCSPlayerController player)
         {
             try
             {
-                return _storageService.IsPlayerDisplayEnabled(player);
+                return _storageService.GetPlayerPreferences(player);
             }
             catch (Exception ex)
             {
                 Server.NextFrame(() =>
                 {
-                    Server.PrintToConsole($"[SpectatorList] Error checking display status for {player.PlayerName}: {ex.Message}");
+                    Server.PrintToConsole($"[SpectatorList] Error loading preferences for {player.PlayerName}: {ex.Message}");
                 });
-                return true;
+                return PlayerDisplayPreferences.FromDefaults(_config.Display);
             }
         }
 
@@ -100,17 +100,18 @@ namespace SpectatorList.Managers
             return AdminManager.PlayerHasPermissions(player, _config.CanViewList);
         }
 
-        public async Task TogglePlayerDisplayAsync(CCSPlayerController player)
+        public async Task<PlayerDisplayPreferences> TogglePlayerDisplayAsync(CCSPlayerController player)
         {
             try
             {
-                await _storageService.TogglePlayerDisplayAsync(player);
+                var preferences = await _storageService.TogglePlayerDisplayAsync(player);
 
-                var isEnabled = await _storageService.IsPlayerDisplayEnabledAsync(player);
-                if (!isEnabled)
+                if (!preferences.Enabled)
                 {
                     Server.NextFrame(() => CleanupPlayerDisplay(player));
                 }
+
+                return preferences;
             }
             catch (Exception ex)
             {
@@ -121,24 +122,48 @@ namespace SpectatorList.Managers
                 {
                     Server.PrintToConsole($"[SpectatorList] Error toggling display for {playerName}: {errorMessage}");
                 });
+
+                return PlayerDisplayPreferences.FromDefaults(_config.Display);
             }
         }
 
-        public void TogglePlayerDisplay(CCSPlayerController player)
+        public PlayerDisplayPreferences TogglePlayerDisplay(CCSPlayerController player)
         {
             try
             {
-                _storageService.TogglePlayerDisplay(player);
+                var preferences = _storageService.TogglePlayerDisplay(player);
 
-                var isEnabled = _storageService.IsPlayerDisplayEnabled(player);
-                if (!isEnabled)
+                if (!preferences.Enabled)
                 {
                     CleanupPlayerDisplay(player);
                 }
+
+                return preferences;
             }
             catch (Exception ex)
             {
                 Server.PrintToConsole($"[SpectatorList] Error toggling display for {player.PlayerName}: {ex.Message}");
+                return PlayerDisplayPreferences.FromDefaults(_config.Display);
+            }
+        }
+
+        public async Task<PlayerDisplayPreferences> UpdatePreferencesAsync(CCSPlayerController player, Action<PlayerDisplayPreferences> updateAction)
+        {
+            try
+            {
+                var preferences = await GetPlayerPreferencesAsync(player);
+                updateAction(preferences);
+                await _storageService.SetPlayerPreferencesAsync(player, preferences);
+                return preferences;
+            }
+            catch (Exception ex)
+            {
+                var playerName = player.PlayerName;
+                Server.NextFrame(() =>
+                {
+                    Server.PrintToConsole($"[SpectatorList] Error updating preferences for {playerName}: {ex.Message}");
+                });
+                return PlayerDisplayPreferences.FromDefaults(_config.Display);
             }
         }
 
@@ -202,8 +227,8 @@ namespace SpectatorList.Managers
             if (!canView)
                 return;
 
-            var isEnabled = await IsPlayerDisplayEnabledAsync(player);
-            if (!isEnabled)
+            var preferences = await GetPlayerPreferencesAsync(player);
+            if (!preferences.Enabled)
                 return;
 
             var filteredSpectators = new List<CCSPlayerController>();
@@ -235,7 +260,7 @@ namespace SpectatorList.Managers
             {
                 try
                 {
-                    DisplayOnScreen(player, filteredSpectators);
+                    DisplayOnScreen(player, filteredSpectators, preferences);
                 }
                 catch (Exception ex)
                 {
@@ -249,28 +274,28 @@ namespace SpectatorList.Managers
             _ = DisplaySpectatorListAsync(player, spectators);
         }
 
-        private void DisplayOnScreen(CCSPlayerController player, List<CCSPlayerController> spectators)
+        private void DisplayOnScreen(CCSPlayerController player, List<CCSPlayerController> spectators, PlayerDisplayPreferences preferences)
         {
             if (spectators.Count == 0)
                 return;
 
             CleanupPlayerDisplay(player);
 
-            if (_config.Display.UseCenterMessage)
+            if (preferences.UseCenterMessage)
             {
                 var centerDisplay = new CenterMessageDisplay(player, _config, _plugin);
                 _centerDisplays[player.Slot] = centerDisplay;
                 centerDisplay.ShowSpectatorList(spectators);
             }
 
-            if (_config.Display.UseScreenView)
+            if (preferences.UseScreenView)
             {
                 var screenDisplay = new ScreenViewDisplay(player, _config, _plugin);
                 _screenDisplays[player.Slot] = screenDisplay;
                 screenDisplay.ShowSpectatorList(spectators);
             }
 
-            if (_config.Display.SendToChat)
+            if (preferences.SendToChat)
             {
                 DisplayInChat(player, spectators);
             }

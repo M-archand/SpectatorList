@@ -11,7 +11,6 @@ namespace SpectatorList.Display
         private readonly SpectatorConfig _config;
         private readonly BasePlugin _plugin;
         private bool _isDisplaying = false;
-        private CounterStrikeSharp.API.Modules.Timers.Timer? _hideTimer;
         private string? _currentMessage;
         private Listeners.OnTick? _onTickHandler;
 
@@ -29,21 +28,13 @@ namespace SpectatorList.Display
 
             try
             {
-                _hideTimer?.Kill();
-                _hideTimer = null;
-
-                _currentMessage = BuildHtmlMessage(spectators);
+                _currentMessage = BuildMessage(spectators);
 
                 if (!_isDisplaying)
                 {
                     _onTickHandler = OnTickUpdate;
                     _plugin.RegisterListener(_onTickHandler);
                     _isDisplaying = true;
-                }
-
-                if (_config.Display.CenterMessageDuration > 0)
-                {
-                    _hideTimer = _plugin.AddTimer(_config.Display.CenterMessageDuration, HideDisplay);
                 }
             }
             catch (Exception ex)
@@ -57,14 +48,13 @@ namespace SpectatorList.Display
             if (!_isDisplaying || !_player.IsValid || string.IsNullOrEmpty(_currentMessage))
                 return;
 
-            _player.PrintToCenterHtml(_currentMessage);
+            _player.PrintToCenter(_currentMessage);
         }
 
-        private string BuildHtmlMessage(List<CCSPlayerController> spectators)
+        private string BuildMessage(List<CCSPlayerController> spectators)
         {
             string titleText = _plugin.Localizer["spectators_title", spectators.Count];
             titleText = titleText.Replace("[SpectatorList]", "").Trim();
-            string escapedTitle = System.Net.WebUtility.HtmlEncode(titleText);
 
             int maxToShow = Math.Min(spectators.Count, _config.Display.MaxNamesInMessage);
             var spectatorNames = new List<string>();
@@ -74,8 +64,7 @@ namespace SpectatorList.Display
                 var spectator = spectators[i];
                 if (spectator.IsValid && !string.IsNullOrEmpty(spectator.PlayerName))
                 {
-                    string escapedName = System.Net.WebUtility.HtmlEncode(spectator.PlayerName);
-                    spectatorNames.Add(escapedName);
+                    spectatorNames.Add(spectator.PlayerName);
                 }
             }
 
@@ -86,16 +75,15 @@ namespace SpectatorList.Display
                 int remaining = spectators.Count - maxToShow;
                 string andMoreText = _plugin.Localizer["and_more", remaining];
                 andMoreText = andMoreText.Replace("[SpectatorList]", "").Trim();
-                string escapedMore = System.Net.WebUtility.HtmlEncode(andMoreText);
-                spectatorsList += $", {escapedMore}";
+                spectatorsList += $", {andMoreText}";
             }
 
-            string html = _config.Display.CenterMessageHtml;
-            html = html.Replace("{TITLE}", escapedTitle);
-            html = html.Replace("{SPECTATORS}", spectatorsList);
-            html = html.Replace("{COUNT}", spectators.Count.ToString());
+            string message = _config.Display.CenterMessage;
+            message = message.Replace("{TITLE}", titleText);
+            message = message.Replace("{SPECTATORS}", spectatorsList);
+            message = message.Replace("{COUNT}", spectators.Count.ToString());
 
-            return html;
+            return message;
         }
 
         public void HideDisplay()
@@ -105,9 +93,6 @@ namespace SpectatorList.Display
 
             try
             {
-                _hideTimer?.Kill();
-                _hideTimer = null;
-
                 if (_onTickHandler != null)
                 {
                     _plugin.RemoveListener(_onTickHandler);
@@ -125,9 +110,6 @@ namespace SpectatorList.Display
 
         public void Dispose()
         {
-            _hideTimer?.Kill();
-            _hideTimer = null;
-
             if (_onTickHandler != null)
             {
                 _onTickHandler = null;

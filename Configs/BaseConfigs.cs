@@ -9,19 +9,16 @@ namespace SpectatorList.Configs
         public List<string> Commands { get; set; } = new List<string> { "css_speclist", "css_specs", "css_spectators" };
 
         [JsonPropertyName("CommandPermissions")]
-        public string CommandPermissions { get; set; } = "@css/vip";
+        public string CommandPermissions { get; set; } = "";
 
         [JsonPropertyName("CanViewList")]
-        public string CanViewList { get; set; } = "@css/vip";
+        public string CanViewList { get; set; } = "";
 
         [JsonPropertyName("UpdateSettings")]
         public UpdateSettings Update { get; set; } = new();
 
         [JsonPropertyName("DisplaySettings")]
         public DisplaySettings Display { get; set; } = new();
-
-        [JsonPropertyName("StorageSettings")]
-        public StorageSettings Storage { get; set; } = new();
     }
 
     public class UpdateSettings
@@ -54,10 +51,10 @@ namespace SpectatorList.Configs
         public bool UseCenterMessage { get; set; } = false;
 
         [JsonPropertyName("CenterMessageDuration")]
-        public float CenterMessageDuration { get; set; } = 5.0f;
+        public float CenterMessageDuration { get; set; } = 0.0f;
 
-        [JsonPropertyName("CenterMessageHtml")]
-        public string CenterMessageHtml { get; set; } = "<font class='fontSize-m' color='#FFD700'>{TITLE}</font><br><font class='fontSize-m' color='#87CEEB'>{SPECTATORS}</font>";
+        [JsonPropertyName("CenterMessage")]
+        public string CenterMessage { get; set; } = "⚠ Spectators: {SPECTATORS}";
 
         [JsonPropertyName("UseScreenView")]
         public bool UseScreenView { get; set; } = true;
@@ -82,32 +79,5 @@ namespace SpectatorList.Configs
 
         [JsonPropertyName("CountColor")]
         public string CountColor { get; set; } = "#87CEEB";
-    }
-
-    public class StorageSettings
-    {
-        [JsonPropertyName("StorageType")]
-        public string StorageType { get; set; } = "PlayerSettings";
-
-        [JsonPropertyName("Database")]
-        public DatabaseConfig Database { get; set; } = new DatabaseConfig();
-    }
-
-    public class DatabaseConfig
-    {
-        [JsonPropertyName("Host")]
-        public string Host { get; set; } = "";
-
-        [JsonPropertyName("Port")]
-        public uint Port { get; set; } = 3306;
-
-        [JsonPropertyName("User")]
-        public string User { get; set; } = "";
-
-        [JsonPropertyName("Password")]
-        public string Password { get; set; } = "";
-
-        [JsonPropertyName("DatabaseName")]
-        public string DatabaseName { get; set; } = "";
     }
 }

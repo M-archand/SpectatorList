@@ -5,10 +5,11 @@ using CounterStrikeSharp.API.Core.Capabilities;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Admin;
 using CounterStrikeSharp.API.Modules.Timers;
-using PlayerSettings;
+using Clientprefs.API;
 
 using SpectatorList.Configs;
 using SpectatorList.Managers;
+using SpectatorList.Models;
 using SpectatorList.Services;
 
 namespace SpectatorList;
@@ -19,39 +20,41 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
     public override string ModuleName => "SpectatorList";
     public override string ModuleVersion => "1.0.5";
     public override string ModuleAuthor => "luca.uy";
-    public override string ModuleDescription => "Toggle spectator list display via chat messages with ScreenView support and exclusion flags";
 
     public SpectatorConfig Config { get; set; } = new();
     private CounterStrikeSharp.API.Modules.Timers.Timer? _updateTimer;
     private Dictionary<int, List<string>> _lastSpectatorLists = new();
     private DisplayManager? _displayManager;
-    private IStorageService? _storageService;
-    private ISettingsApi? _settingsApi;
-    private readonly PluginCapability<ISettingsApi?> _settingsCapability = new("settings:nfcore");
+    private IClientprefsApi? _clientPrefsApi;
+    private readonly PluginCapability<IClientprefsApi> _clientPrefsCapability = new("Clientprefs");
 
     public void OnConfigParsed(SpectatorConfig config)
     {
         Config = config;
-        ValidateConfig();
-        InitializeStorage();
-    }
-
-    private void ValidateConfig()
-    {
-        var validStorageTypes = new[] { "playersettings", "mysql", "memory" };
-        if (!validStorageTypes.Contains(Config.Storage.StorageType.ToLower()))
+        if (_clientPrefsApi != null)
         {
-            Server.PrintToConsole($"[SpectatorList] Invalid StorageType '{Config.Storage.StorageType}'. Valid options: {string.Join(", ", validStorageTypes)}");
-            Server.PrintToConsole("[SpectatorList] Falling back to 'memory' storage");
-            Config.Storage.StorageType = "memory";
+            InitializeStorage();
         }
     }
 
     private void InitializeStorage()
     {
         _displayManager?.Dispose();
-        _storageService = StorageFactory.CreateStorageService(Config, _settingsApi);
-        _displayManager = new DisplayManager(Config, this, _storageService);
+        _displayManager = null;
+
+        if (_clientPrefsApi == null)
+        {
+            Server.PrintToConsole("[SpectatorList] Clientprefs API not available; preferences will use configuration defaults for this session.");
+            return;
+        }
+
+        var storage = StorageFactory.CreateStorageService(Config, _clientPrefsApi);
+        if (storage == null)
+        {
+            return;
+        }
+
+        _displayManager = new DisplayManager(Config, this, storage);
     }
 
     private HookResult OnRoundEnd(EventRoundEnd @event, GameEventInfo info)
@@ -70,8 +73,6 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
 
     public override void Load(bool hotReload)
     {
-        InitializeStorage();
-
         foreach (var command in Config.Commands)
         {
             AddCommand(command, "Toggle spectator list display", OnSpectatorListCommand);
@@ -90,12 +91,10 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
 
     public override void OnAllPluginsLoaded(bool hotReload)
     {
-        _settingsApi = _settingsCapability.Get();
-
-        if (_settingsApi == null && Config.Storage.StorageType.ToLower() == "playersettings")
+        _clientPrefsApi = _clientPrefsCapability.Get();
+        if (_clientPrefsApi == null)
         {
-            Server.PrintToConsole("[SpectatorList] PlayerSettings core not found, but was requested in config.");
-            Server.PrintToConsole("[SpectatorList] Reconfiguring to use fallback storage...");
+            Server.PrintToConsole("[SpectatorList] Clientprefs plugin not found. Player preferences will not be persisted.");
         }
 
         InitializeStorage();
@@ -108,7 +107,6 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
 
         _displayManager?.Dispose();
         _displayManager = null;
-        _storageService = null;
     }
 
     private void StartUpdateTimer()
@@ -141,6 +139,12 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
             return;
         }
 
+        if (commandInfo.ArgCount > 1)
+        {
+            _ = HandlePreferenceCommand(player, commandInfo);
+            return;
+        }
+
         _ = HandleToggleCommand(player, commandInfo);
     }
 
@@ -160,10 +164,8 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
                 return;
             }
 
-            await _displayManager.TogglePlayerDisplayAsync(player);
-
-            bool isEnabled = await _displayManager.IsPlayerDisplayEnabledAsync(player);
-            string message = isEnabled ? Localizer["spectator_display_enabled"] : Localizer["spectator_display_disabled"];
+            var preferences = await _displayManager.TogglePlayerDisplayAsync(player);
+            string message = preferences.Enabled ? Localizer["spectator_display_enabled"] : Localizer["spectator_display_disabled"];
 
             Server.NextFrame(() =>
             {
@@ -180,7 +182,7 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
                 }
             });
 
-            if (isEnabled)
+            if (preferences.Enabled)
             {
                 Server.NextFrame(() =>
                 {
@@ -212,6 +214,151 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
                     player.PrintToChat($"{Localizer["prefix"]} An error occurred while processing your request");
                 }
             });
+        }
+    }
+
+    private async Task HandlePreferenceCommand(CCSPlayerController player, CommandInfo commandInfo)
+    {
+        try
+        {
+            if (_displayManager == null)
+            {
+                commandInfo.ReplyToCommand($"{Localizer["prefix"]} Display manager not initialized");
+                return;
+            }
+
+            if (commandInfo.ArgCount <= 1)
+            {
+                await HandleToggleCommand(player, commandInfo);
+                return;
+            }
+
+            var action = commandInfo.GetArg(1).ToLowerInvariant();
+            bool? explicitValue = null;
+
+            if (commandInfo.ArgCount > 2 && TryParsePreferenceValue(commandInfo.GetArg(2), out var parsedValue))
+            {
+                explicitValue = parsedValue;
+            }
+
+            PlayerDisplayPreferences? updatedPreferences = null;
+
+            switch (action)
+            {
+                case "chat":
+                case "sendtochat":
+                    updatedPreferences = await _displayManager.UpdatePreferencesAsync(player, prefs =>
+                    {
+                        prefs.SendToChat = explicitValue ?? !prefs.SendToChat;
+                    });
+                    SendPreferenceFeedback(player, $"Chat output {(updatedPreferences.SendToChat ? "enabled" : "disabled")}");
+                    break;
+
+                case "center":
+                case "centermessage":
+                    updatedPreferences = await _displayManager.UpdatePreferencesAsync(player, prefs =>
+                    {
+                        prefs.UseCenterMessage = explicitValue ?? !prefs.UseCenterMessage;
+                    });
+                    SendPreferenceFeedback(player, $"Center message {(updatedPreferences.UseCenterMessage ? "enabled" : "disabled")}");
+                    break;
+
+                case "screen":
+                case "screenview":
+                    updatedPreferences = await _displayManager.UpdatePreferencesAsync(player, prefs =>
+                    {
+                        prefs.UseScreenView = explicitValue ?? !prefs.UseScreenView;
+                    });
+                    SendPreferenceFeedback(player, $"Screen view {(updatedPreferences.UseScreenView ? "enabled" : "disabled")}");
+                    break;
+
+                case "reset":
+                    var defaults = PlayerDisplayPreferences.FromDefaults(Config.Display);
+                    updatedPreferences = await _displayManager.UpdatePreferencesAsync(player, prefs =>
+                    {
+                        prefs.Enabled = defaults.Enabled;
+                        prefs.SendToChat = defaults.SendToChat;
+                        prefs.UseCenterMessage = defaults.UseCenterMessage;
+                        prefs.UseScreenView = defaults.UseScreenView;
+                    });
+                    SendPreferenceFeedback(player, "Spectator settings reset to defaults");
+                    break;
+
+                default:
+                    await HandleToggleCommand(player, commandInfo);
+                    return;
+            }
+
+            if (updatedPreferences != null && updatedPreferences.Enabled)
+            {
+                Server.NextFrame(() =>
+                {
+                    try
+                    {
+                        if (player.IsValid && _displayManager != null)
+                        {
+                            var spectators = GetPlayersSpectating(player);
+                            if (spectators.Count > 0)
+                            {
+                                _ = _displayManager.DisplaySpectatorListAsync(player, spectators);
+                            }
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Server.PrintToConsole($"[SpectatorList] Error displaying spectators after preference update: {ex.Message}");
+                    }
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Server.NextFrame(() =>
+            {
+                Server.PrintToConsole($"[SpectatorList] Error updating preferences: {ex.Message}");
+                if (player.IsValid)
+                {
+                    player.PrintToChat($"{Localizer["prefix"]} An error occurred while updating your preferences");
+                }
+            });
+        }
+    }
+
+    private void SendPreferenceFeedback(CCSPlayerController player, string message)
+    {
+        Server.NextFrame(() =>
+        {
+            if (player.IsValid)
+            {
+                player.PrintToChat($"{Localizer["prefix"]} {message}");
+            }
+        });
+    }
+
+    private static bool TryParsePreferenceValue(string value, out bool result)
+    {
+        result = false;
+
+        switch (value.ToLowerInvariant())
+        {
+            case "1":
+            case "on":
+            case "true":
+            case "yes":
+            case "enable":
+            case "enabled":
+                result = true;
+                return true;
+            case "0":
+            case "off":
+            case "false":
+            case "no":
+            case "disable":
+            case "disabled":
+                result = false;
+                return true;
+            default:
+                return false;
         }
     }
 
@@ -314,6 +461,10 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
         foreach (var player in allPlayers)
         {
             if (!player.IsValid || player.Slot == targetPlayer.Slot)
+                continue;
+
+            // Ignore players still on the team selection screen (unassigned team).
+            if (player.TeamNum == 0)
                 continue;
 
             if (player.PawnIsAlive)
@@ -424,7 +575,11 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
         foreach (var player in alivePlayers)
         {
             var currentSpectators = GetPlayersSpectating(player);
-            if (currentSpectators.Count > 0)
+            var currentSpectatorNames = currentSpectators.Select(s => s.PlayerName).ToList();
+            var hasChanged = !_lastSpectatorLists.TryGetValue(player.Slot, out var lastList) ||
+                             !currentSpectatorNames.SequenceEqual(lastList);
+
+            if (currentSpectators.Count > 0 && hasChanged)
             {
                 tasks.Add(_displayManager.DisplaySpectatorListAsync(player, currentSpectators));
             }
@@ -433,7 +588,6 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
                 _displayManager.CleanupPlayerDisplay(player);
             }
 
-            var currentSpectatorNames = currentSpectators.Select(s => s.PlayerName).ToList();
             _lastSpectatorLists[player.Slot] = currentSpectatorNames;
         }
 

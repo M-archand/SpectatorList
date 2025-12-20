@@ -16,31 +16,18 @@ Shows real-time spectators both in chat messages and on-screen display with cust
 3. Extract and upload to your game server
 4. Start server and configure the generated config file
 
-### Optional Dependencies (for PlayerSettings storage)
-If you want to use `PlayerSettings` storage type:
-1. Install [AnyBaseLibCS2](https://github.com/NickFox007/AnyBaseLibCS2/releases/latest) (required for PlayerSettings)
-2. Install [PlayerSettingsCS2](https://github.com/NickFox007/PlayerSettingsCS2/releases/latest) (required dependency)
-3. Set `StorageType` to `"PlayerSettings"` in your config
-
-### Optional Dependencies (for MySQL storage)
-If you want to use `MySQL` storage type:
-1. Configure your MySQL database
-2. Set `StorageType` to `"MySQL"` in your config
-3. Fill in the database connection details
+### Dependency: Clientprefs
+- Install the [Clientprefs plugin](https://github.com/hey-cruze/Clientprefs) so player settings can persist.
+- SpectatorList registers the cookie `spectatorlist_config` (id: `6`, description: `JSON SpectatorList settings`, access: public).
+- Each player stores a single JSON blob in `clientprefs_playerdata.value`, for example `{"Enabled":false,"SendToChat":true,"UseCenterMessage":false,"UseScreenView":true}`.
 
 ---
 
-## ⚙️ Storage Options
+## ⚙️ Storage (Clientprefs)
 
-The plugin supports three different storage methods for user preferences:
-
-| Storage Type | Description | Persistence | Performance | Dependencies |
-|--------------|-------------|-------------|-------------|--------------|
-| **PlayerSettings** | Uses PlayerSettings plugin | ✅ Persistent | ⚡ Fast | PlayerSettingsCS2 + AnyBaseLibCS2 |
-| **MySQL** | Traditional database storage | ✅ Persistent | 🔄 Database queries | MySQL/MariaDB database |
-| **Memory** | Temporary in-memory storage | ❌ Lost on restart | ⚡⚡ Fastest | None |
-
-**Recommendation**: Use `PlayerSettings` for most servers, `MySQL` if you don't care about the number of active pool connections, and `Memory` for testing.
+- Preferences are stored via the Clientprefs cookie `spectatorlist_config` (id `6`) with description `JSON SpectatorList settings` and public access.
+- One row per steamid lives in `clientprefs_playerdata`, storing a JSON blob of all toggleable options.
+- No data is created for a player until they change a setting away from the defaults provided in `DisplaySettings`.
 
 ---
 
@@ -51,14 +38,7 @@ The plugin supports three different storage methods for user preferences:
 | `CommandPermissions` | Permission flag required to use the toggle commands. Leave empty for all players. (**Default**: `"@css/vip"`) | **YES**  |
 | `CanViewList`        | Permission flag required to view spectator lists (both chat and screen). Leave empty for all players. (**Default**: `"@css/vip"`) | **YES**  |
 | `UpdateSettings`     | Configuration for automatic updates and periodic displays. | **YES**  |
-| `DisplaySettings`    | Configuration for how spectator lists are displayed. | **YES**  |
-| `StorageSettings`    | Configuration for user preference storage method. | **YES**  |
-
-### Storage Settings Parameters
-| Parameter         | Description                                                                                         | Required |
-|-------------------|-----------------------------------------------------------------------------------------------------|----------|
-| `StorageType`     | Storage method to use: `"PlayerSettings"`, `"MySQL"`, or `"Memory"`. (**Default**: `"PlayerSettings"`) | **YES**  |
-| `Database`        | MySQL database configuration (only used when `StorageType` is `"MySQL"`). | **NO**   |
+| `DisplaySettings`    | Configuration for how spectator lists are displayed and the defaults applied to new players. | **YES**  |
 
 ### Update Settings Parameters
 | Parameter         | Description                                                                                         | Required |
@@ -76,7 +56,8 @@ The plugin supports three different storage methods for user preferences:
 | `SendToChat`      | Enable/disable chat messages for spectator lists. (**Default**: `false`) | **YES**  |
 | `UseCenterMessage` | Enable/disable center screen HTML message display for spectator lists. (**Default**: `false`) | **YES**  |
 | `CenterMessageDuration` | Duration (in seconds) to show center message before auto-hiding. Set to 0 for permanent display. (**Default**: `5.0`) | **YES**  |
-| `CenterMessageHtml` | Custom HTML template for center messages. Use placeholders: `{TITLE}`, `{SPECTATORS}`, `{COUNT}`. (**Default**: `"<font class='fontSize-m' color='#FFD700'>{TITLE}</font><br><font class='fontSize-m' color='#87CEEB'>{SPECTATORS}</font>`) | **YES**  |
+| `CenterMessage` | Custom message template for center messages. Use placeholders: `{TITLE}`, `{SPECTATORS}`, `{COUNT}`. (**Default**: `"⚠ Spectators: {SPECTATORS}"`) | **YES**  |
+| `CenterMessageDuration` | Duration (seconds) to auto-hide the center message. Set to `0` to keep it visible while spectators are present. (**Default**: `0.0`) | **YES**  |
 | `UseScreenView`   | Enable/disable on-screen floating text display. (**Default**: `true`) | **YES**  |
 | `ScreenViewSettings` | Configuration for on-screen display positioning and appearance. | **YES**  |
 
@@ -89,15 +70,12 @@ The plugin supports three different storage methods for user preferences:
 | `PlayerNameColor` | Hex color code for spectator names. (**Default**: `"#FFFFFF"`) | **YES**  |
 | `CountColor`      | Hex color code for spectator count. (**Default**: `"#87CEEB"`) | **YES**  |
 
-### Database Settings Parameters
-*(Only used when `StorageType` is set to `"MySQL"`)*
-| Parameter         | Description                                                                                         | Required |
-|-------------------|-----------------------------------------------------------------------------------------------------|----------|
-| `Host`            | MySQL server hostname or IP address. (**Default**: `""`) | **NO**   |
-| `Port`            | MySQL server port. (**Default**: `3306`) | **NO**   |
-| `User`            | MySQL username for database connection. (**Default**: `""`) | **NO**   |
-| `Password`        | MySQL password for database connection. (**Default**: `""`) | **NO**   |
-| `DatabaseName`    | Name of the MySQL database to use. (**Default**: `""`) | **NO**   |
+### Player Preference Commands
+- `css_speclist`: Toggle the spectator list on/off for yourself.
+- `css_speclist chat [on|off]`: Enable or disable chat output for your spectator list.
+- `css_speclist center [on|off]`: Enable or disable the center message display for your spectator list.
+- `css_speclist screen [on|off]`: Enable or disable the on-screen floating text display for your spectator list.
+- `css_speclist reset`: Return to the defaults defined in `DisplaySettings`.
 
 ---
 

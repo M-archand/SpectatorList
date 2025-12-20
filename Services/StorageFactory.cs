@@ -1,52 +1,20 @@
 using CounterStrikeSharp.API;
-using PlayerSettings;
-
 using SpectatorList.Configs;
+using Clientprefs.API;
 
 namespace SpectatorList.Services
 {
     public static class StorageFactory
     {
-        public static IStorageService CreateStorageService(SpectatorConfig config, ISettingsApi? settingsApi)
+        public static IStorageService? CreateStorageService(SpectatorConfig config, IClientprefsApi? clientprefsApi)
         {
-            var storageType = config.Storage.StorageType.ToLower();
-
-            switch (storageType)
+            if (clientprefsApi == null)
             {
-                case "playersettings":
-                    if (settingsApi != null)
-                    {
-                        return new PlayerSettingsStorage(settingsApi);
-                    }
-                    else
-                    {
-                        Server.PrintToConsole("[SpectatorList] PlayerSettings requested but not available, falling back to Memory storage");
-                        return new MemoryStorage();
-                    }
-
-                case "mysql":
-                    if (IsValidDatabaseConfig(config.Storage.Database))
-                    {
-                        return new DatabaseService(config);
-                    }
-                    else
-                    {
-                        Server.PrintToConsole("[SpectatorList] MySQL requested but database configuration is invalid, falling back to Memory storage");
-                        return new MemoryStorage();
-                    }
-
-                case "memory":
-                    return new MemoryStorage();
-
-                default:
-                    Server.PrintToConsole($"[SpectatorList] Unknown storage type '{config.Storage.StorageType}', falling back to Memory storage");
-                    return new MemoryStorage();
+                Server.PrintToConsole("[SpectatorList] Clientprefs API not available. Preferences will fallback to defaults.");
+                return null;
             }
-        }
 
-        private static bool IsValidDatabaseConfig(DatabaseConfig dbConfig)
-        {
-            return !string.IsNullOrEmpty(dbConfig.Host) && !string.IsNullOrEmpty(dbConfig.DatabaseName) && !string.IsNullOrEmpty(dbConfig.User);
+            return new ClientPrefsStorage(config, clientprefsApi);
         }
     }
 }
