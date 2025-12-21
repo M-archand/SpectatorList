@@ -19,6 +19,9 @@ namespace SpectatorList.Configs
 
         [JsonPropertyName("DisplaySettings")]
         public DisplaySettings Display { get; set; } = new();
+
+        [JsonPropertyName("MenuSettings")]
+        public MenuSettings Menu { get; set; } = new();
     }
 
     public class UpdateSettings
@@ -79,5 +82,14 @@ namespace SpectatorList.Configs
 
         [JsonPropertyName("CountColor")]
         public string CountColor { get; set; } = "#87CEEB";
+    }
+
+    public class MenuSettings
+    {
+        [JsonPropertyName("MenuType")]
+        public string MenuType { get; set; } = "WasdMenu";
+
+        [JsonPropertyName("FreezePlayer")]
+        public bool FreezePlayer { get; set; } = true;
     }
 }

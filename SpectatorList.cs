@@ -5,6 +5,9 @@ using CounterStrikeSharp.API.Core.Capabilities;
 using CounterStrikeSharp.API.Modules.Commands;
 using CounterStrikeSharp.API.Modules.Admin;
 using CounterStrikeSharp.API.Modules.Timers;
+using CS2MenuManager.API.Class;
+using CS2MenuManager.API.Enum;
+using CS2MenuManager.API.Menu;
 using Clientprefs.API;
 
 using SpectatorList.Configs;
@@ -145,7 +148,305 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
             return;
         }
 
-        _ = HandleToggleCommand(player, commandInfo);
+        _ = ShowSpectatorMenuAsync(player);
+    }
+
+    private async Task ShowSpectatorMenuAsync(CCSPlayerController player)
+    {
+        if (_displayManager == null || !player.IsValid)
+        {
+            return;
+        }
+
+        var preferences = await _displayManager.GetPlayerPreferencesAsync(player);
+
+        var menu = CreateMenu("Spectator List");
+        menu.MenuTime = 0;
+
+        AddToggleMenuItem(menu, preferences);
+        AddDisplayTypeMenuItem(menu);
+
+        menu.Display(player, 0);
+    }
+
+    private BaseMenu CreateMenu(string title, BaseMenu? prevMenu = null)
+    {
+        var menuType = string.IsNullOrWhiteSpace(Config.Menu.MenuType) ? "WasdMenu" : Config.Menu.MenuType;
+        BaseMenu menu;
+        try
+        {
+            menu = MenuManager.MenuByType(menuType, title, this);
+        }
+        catch
+        {
+            menu = new WasdMenu(title, this);
+        }
+
+        if (menu is WasdMenu wasdMenu)
+        {
+            wasdMenu.WasdMenu_FreezePlayer = Config.Menu.FreezePlayer;
+        }
+
+        menu.PrevMenu = prevMenu;
+        return menu;
+    }
+
+    private void AddToggleMenuItem(BaseMenu menu, PlayerDisplayPreferences preferences)
+    {
+        var toggleOption = menu.AddItem(BuildToggleOptionText(preferences.Enabled), async (p, option) =>
+        {
+            await HandleToggleMenuSelectionAsync(p, option, menu);
+        });
+
+        toggleOption.PostSelectAction = PostSelectAction.Nothing;
+    }
+
+    private void AddDisplayTypeMenuItem(BaseMenu menu)
+    {
+        var displayTypeOption = menu.AddItem(ColorizeText("Display Type", "White"), async (p, _) =>
+        {
+            await ShowDisplayTypeMenuAsync(p, menu);
+        });
+
+        displayTypeOption.PostSelectAction = PostSelectAction.Nothing;
+    }
+
+    private async Task HandleToggleMenuSelectionAsync(CCSPlayerController player, ItemOption option, BaseMenu menu)
+    {
+        if (_displayManager == null || player == null || !player.IsValid)
+        {
+            return;
+        }
+
+        var updatedPreferences = await _displayManager.UpdatePreferencesAsync(player, prefs =>
+        {
+            prefs.Enabled = !prefs.Enabled;
+        });
+
+        if (!player.IsValid)
+        {
+            return;
+        }
+
+        option.Text = BuildToggleOptionText(updatedPreferences.Enabled);
+
+        var message = updatedPreferences.Enabled
+            ? Localizer["spectator_display_enabled"]
+            : Localizer["spectator_display_disabled"];
+
+        SendPreferenceFeedback(player, message);
+
+        if (!updatedPreferences.Enabled)
+        {
+            _displayManager.CleanupPlayerDisplay(player);
+        }
+        else
+        {
+            Server.NextFrame(() =>
+            {
+                try
+                {
+                    if (player.IsValid && _displayManager != null)
+                    {
+                        var spectators = GetPlayersSpectating(player);
+                        if (spectators.Count > 0)
+                        {
+                            _ = _displayManager.DisplaySpectatorListAsync(player, spectators);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Server.PrintToConsole($"[SpectatorList] Error displaying spectators after enabling via menu: {ex.Message}");
+                }
+            });
+        }
+
+        RefreshMenu(menu, player);
+    }
+
+    private async Task ShowDisplayTypeMenuAsync(CCSPlayerController player, BaseMenu parentMenu)
+    {
+        if (_displayManager == null || player == null || !player.IsValid)
+        {
+            return;
+        }
+
+        var preferences = await _displayManager.GetPlayerPreferencesAsync(player);
+
+        var menu = CreateMenu("Spectator List - Display Type", parentMenu);
+        menu.MenuTime = 0;
+
+        ItemOption? chatOption = null;
+        ItemOption? hudOption = null;
+        ItemOption? bothOption = null;
+
+        chatOption = menu.AddItem(BuildDisplayTypeOptionText("CHAT", preferences.SendToChat), async (p, _) =>
+        {
+            await HandleDisplayTypeSelectionAsync(p, DisplaySelection.Chat, menu, chatOption!, hudOption!, bothOption!);
+        });
+        chatOption.PostSelectAction = PostSelectAction.Nothing;
+
+        hudOption = menu.AddItem(BuildDisplayTypeOptionText("HUD", preferences.UseCenterMessage), async (p, _) =>
+        {
+            await HandleDisplayTypeSelectionAsync(p, DisplaySelection.Hud, menu, chatOption!, hudOption!, bothOption!);
+        });
+        hudOption.PostSelectAction = PostSelectAction.Nothing;
+
+        var bothEnabled = preferences.SendToChat && preferences.UseCenterMessage;
+        bothOption = menu.AddItem(BuildDisplayTypeOptionText("BOTH", bothEnabled), async (p, _) =>
+        {
+            await HandleDisplayTypeSelectionAsync(p, DisplaySelection.Both, menu, chatOption!, hudOption!, bothOption!);
+        });
+        bothOption.PostSelectAction = PostSelectAction.Nothing;
+
+        menu.Display(player, 0);
+    }
+
+    private async Task HandleDisplayTypeSelectionAsync(CCSPlayerController player, DisplaySelection selection, BaseMenu menu, ItemOption chatOption, ItemOption hudOption, ItemOption bothOption)
+    {
+        if (_displayManager == null || player == null || !player.IsValid)
+        {
+            return;
+        }
+
+        bool appliedFallbackToBoth = false;
+
+        var updatedPreferences = await _displayManager.UpdatePreferencesAsync(player, prefs =>
+        {
+            switch (selection)
+            {
+                case DisplaySelection.Chat:
+                    prefs.SendToChat = !prefs.SendToChat;
+                    break;
+                case DisplaySelection.Hud:
+                    prefs.UseCenterMessage = !prefs.UseCenterMessage;
+                    break;
+                case DisplaySelection.Both:
+                    var enableBoth = !(prefs.SendToChat && prefs.UseCenterMessage);
+                    prefs.SendToChat = enableBoth;
+                    prefs.UseCenterMessage = enableBoth;
+                    break;
+            }
+
+            if (prefs.Enabled && !prefs.SendToChat && !prefs.UseCenterMessage)
+            {
+                prefs.SendToChat = true;
+                prefs.UseCenterMessage = true;
+                appliedFallbackToBoth = true;
+            }
+        });
+
+        if (!player.IsValid)
+        {
+            return;
+        }
+
+        UpdateDisplayTypeOptionColors(chatOption, hudOption, bothOption, updatedPreferences);
+        AnnounceDisplayChoice(player, selection, updatedPreferences);
+        if (appliedFallbackToBoth)
+        {
+            SendPreferenceFeedback(player, "No display outputs selected; enabling BOTH as fallback");
+        }
+        if (updatedPreferences.Enabled)
+        {
+            Server.NextFrame(() =>
+            {
+                try
+                {
+                    if (player.IsValid && _displayManager != null)
+                    {
+                        var spectators = GetPlayersSpectating(player);
+                        if (spectators.Count > 0)
+                        {
+                            _ = _displayManager.DisplaySpectatorListAsync(player, spectators);
+                        }
+                        else
+                        {
+                            _displayManager.CleanupPlayerDisplay(player);
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Server.PrintToConsole($"[SpectatorList] Error displaying spectators after display type change: {ex.Message}");
+                }
+            });
+        }
+        RefreshMenu(menu, player);
+    }
+
+    private void AnnounceDisplayChoice(CCSPlayerController player, DisplaySelection selection, PlayerDisplayPreferences preferences)
+    {
+        var choiceLabel = selection switch
+        {
+            DisplaySelection.Chat => "CHAT",
+            DisplaySelection.Hud => "HUD",
+            DisplaySelection.Both => "BOTH",
+            _ => "DISPLAY"
+        };
+
+        var enabled = selection switch
+        {
+            DisplaySelection.Chat => preferences.SendToChat,
+            DisplaySelection.Hud => preferences.UseCenterMessage,
+            DisplaySelection.Both => preferences.SendToChat && preferences.UseCenterMessage,
+            _ => false
+        };
+
+        var status = enabled ? "ENABLED" : "DISABLED";
+        SendPreferenceFeedback(player, $"{choiceLabel} {status}");
+    }
+
+    private static void UpdateDisplayTypeOptionColors(ItemOption chatOption, ItemOption hudOption, ItemOption bothOption, PlayerDisplayPreferences preferences)
+    {
+        chatOption.Text = BuildDisplayTypeOptionText("CHAT", preferences.SendToChat);
+        hudOption.Text = BuildDisplayTypeOptionText("HUD", preferences.UseCenterMessage);
+        bothOption.Text = BuildDisplayTypeOptionText("BOTH", preferences.SendToChat && preferences.UseCenterMessage);
+    }
+
+    private static string BuildDisplayTypeOptionText(string label, bool enabled)
+    {
+        return ColorizeText(label, enabled ? "Lime" : "LightRed");
+    }
+
+    private static string BuildToggleOptionText(bool enabled)
+    {
+        return ColorizeText(enabled ? "Toggle OFF" : "Toggle ON", enabled ? "LightRed" : "Lime");
+    }
+
+    private static string ColorizeText(string text, string color)
+    {
+        return $"<font color='{ResolveColor(color)}'>{text}</font>";
+    }
+
+    private static string ResolveColor(string color)
+    {
+        return color.Equals("LightRed", StringComparison.OrdinalIgnoreCase) ? "#ff4d4d" : color;
+    }
+
+    private enum DisplaySelection
+    {
+        Chat,
+        Hud,
+        Both
+    }
+
+    private static void RefreshMenu(BaseMenu menu, CCSPlayerController player)
+    {
+        Server.NextFrame(() =>
+        {
+            if (!player.IsValid)
+            {
+                return;
+            }
+
+            var activeMenu = MenuManager.GetActiveMenu(player);
+            if (activeMenu != null && ReferenceEquals(activeMenu.Menu, menu))
+            {
+                activeMenu.Display();
+            }
+        });
     }
 
     private async Task HandleToggleCommand(CCSPlayerController player, CommandInfo commandInfo)
