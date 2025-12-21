@@ -329,7 +329,7 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
                     break;
             }
 
-            if (prefs.Enabled && !prefs.SendToChat && !prefs.UseCenterMessage)
+            if (!prefs.SendToChat && !prefs.UseCenterMessage)
             {
                 prefs.SendToChat = true;
                 prefs.UseCenterMessage = true;
