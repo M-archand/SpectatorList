@@ -41,6 +41,9 @@ namespace SpectatorList.Configs
 
     public class DisplaySettings
     {
+        [JsonPropertyName("EnabledByDefault")]
+        public bool EnabledByDefault { get; set; } = true;
+        
         [JsonPropertyName("ExclusionFlag")]
         public string ExclusionFlag { get; set; } = "@css/generic";
 

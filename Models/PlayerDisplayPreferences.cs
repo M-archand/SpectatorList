@@ -14,7 +14,7 @@ namespace SpectatorList.Models
         {
             return new PlayerDisplayPreferences
             {
-                Enabled = true,
+                Enabled = defaults.EnabledByDefault,
                 SendToChat = defaults.SendToChat,
                 UseCenterMessage = defaults.UseCenterMessage,
                 UseScreenView = defaults.UseScreenView
