@@ -47,14 +47,19 @@ namespace SpectatorList.Services
         {
             var success = await EnsureCookieRegisteredAsync();
 
-            if (!success)
+            var cookieId = _cookieId;
+
+            Server.NextFrame(() =>
             {
-                Server.PrintToConsole("[SpectatorList] Clientprefs cookie registration failed; preferences will use defaults only.");
-            }
-            else
-            {
-                Server.PrintToConsole($"[SpectatorList] Using Clientprefs storage (cookie id: {_cookieId})");
-            }
+                if (!success)
+                {
+                    Server.PrintToConsole("[SpectatorList] Clientprefs cookie registration failed; preferences will use defaults only.");
+                }
+                else
+                {
+                    Server.PrintToConsole($"[SpectatorList] Using Clientprefs storage (cookie id: {cookieId})");
+                }
+            });
 
             return success;
         }
