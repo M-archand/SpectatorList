@@ -160,12 +160,20 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
 
         var preferences = await _displayManager.GetPlayerPreferencesAsync(player);
 
-        var menu = CreateMenu("Spectator List");
+        Server.NextFrame(() =>
+        {
+            if (!player.IsValid)
+            {
+                return;
+            }
 
-        AddToggleMenuItem(menu, preferences);
-        AddDisplayTypeMenuItem(menu);
+            var menu = CreateMenu("Spectator List");
 
-        menu.Display(player, 0);
+            AddToggleMenuItem(menu, preferences);
+            AddDisplayTypeMenuItem(menu);
+
+            menu.Display(player, 0);
+        });
     }
 
     private BaseMenu CreateMenu(string title, BaseMenu? prevMenu = null)
@@ -273,32 +281,40 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
 
         var preferences = await _displayManager.GetPlayerPreferencesAsync(player);
 
-        var menu = CreateMenu("Spectator List - Display Type", parentMenu);
-
-        ItemOption? chatOption = null;
-        ItemOption? hudOption = null;
-        ItemOption? bothOption = null;
-
-        chatOption = menu.AddItem(BuildDisplayTypeOptionText("CHAT", preferences.SendToChat), async (p, _) =>
+        Server.NextFrame(() =>
         {
-            await HandleDisplayTypeSelectionAsync(p, DisplaySelection.Chat, menu, chatOption!, hudOption!, bothOption!);
-        });
-        chatOption.PostSelectAction = PostSelectAction.Nothing;
+            if (!player.IsValid)
+            {
+                return;
+            }
 
-        hudOption = menu.AddItem(BuildDisplayTypeOptionText("HUD", preferences.UseCenterMessage), async (p, _) =>
-        {
-            await HandleDisplayTypeSelectionAsync(p, DisplaySelection.Hud, menu, chatOption!, hudOption!, bothOption!);
-        });
-        hudOption.PostSelectAction = PostSelectAction.Nothing;
+            var menu = CreateMenu("Spectator List - Display Type", parentMenu);
 
-        var bothEnabled = preferences.SendToChat && preferences.UseCenterMessage;
-        bothOption = menu.AddItem(BuildDisplayTypeOptionText("BOTH", bothEnabled), async (p, _) =>
-        {
-            await HandleDisplayTypeSelectionAsync(p, DisplaySelection.Both, menu, chatOption!, hudOption!, bothOption!);
-        });
-        bothOption.PostSelectAction = PostSelectAction.Nothing;
+            ItemOption? chatOption = null;
+            ItemOption? hudOption = null;
+            ItemOption? bothOption = null;
 
-        menu.Display(player, 0);
+            chatOption = menu.AddItem(BuildDisplayTypeOptionText("CHAT", preferences.SendToChat), async (p, _) =>
+            {
+                await HandleDisplayTypeSelectionAsync(p, DisplaySelection.Chat, menu, chatOption!, hudOption!, bothOption!);
+            });
+            chatOption.PostSelectAction = PostSelectAction.Nothing;
+
+            hudOption = menu.AddItem(BuildDisplayTypeOptionText("HUD", preferences.UseCenterMessage), async (p, _) =>
+            {
+                await HandleDisplayTypeSelectionAsync(p, DisplaySelection.Hud, menu, chatOption!, hudOption!, bothOption!);
+            });
+            hudOption.PostSelectAction = PostSelectAction.Nothing;
+
+            var bothEnabled = preferences.SendToChat && preferences.UseCenterMessage;
+            bothOption = menu.AddItem(BuildDisplayTypeOptionText("BOTH", bothEnabled), async (p, _) =>
+            {
+                await HandleDisplayTypeSelectionAsync(p, DisplaySelection.Both, menu, chatOption!, hudOption!, bothOption!);
+            });
+            bothOption.PostSelectAction = PostSelectAction.Nothing;
+
+            menu.Display(player, 0);
+        });
     }
 
     private async Task HandleDisplayTypeSelectionAsync(CCSPlayerController player, DisplaySelection selection, BaseMenu menu, ItemOption chatOption, ItemOption hudOption, ItemOption bothOption)
