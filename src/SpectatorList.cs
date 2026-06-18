@@ -27,6 +27,7 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
     public SpectatorConfig Config { get; set; } = new();
     private CounterStrikeSharp.API.Modules.Timers.Timer? _updateTimer;
     private Dictionary<int, List<string>> _lastSpectatorLists = new();
+    private float _lastPeriodicFireTime = float.NegativeInfinity;
     private DisplayManager? _displayManager;
     private IClientprefsApi? _clientPrefsApi;
     private readonly PluginCapability<IClientprefsApi> _clientPrefsCapability = new("Clientprefs");
@@ -734,13 +735,11 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
     {
         if (_displayManager == null) return;
 
-        bool ShouldShowPeriodic()
-        {
-            return Server.CurrentTime % Config.Update.PeriodicInterval < Config.Update.CheckInterval;
-        }
-
-        if (!ShouldShowPeriodic())
+        if (Server.CurrentTime >= _lastPeriodicFireTime &&
+            Server.CurrentTime - _lastPeriodicFireTime < Config.Update.PeriodicInterval)
             return;
+
+        _lastPeriodicFireTime = Server.CurrentTime;
 
         var alivePlayers = Utilities.GetPlayers().Where(p => p.IsValid && p.PawnIsAlive).ToList();
         var spectatorMap = BuildSpectatorMap();
