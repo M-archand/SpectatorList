@@ -76,22 +76,6 @@ namespace SpectatorList.Managers
             }
         }
 
-        public PlayerDisplayPreferences GetPlayerPreferences(CCSPlayerController player)
-        {
-            try
-            {
-                return _storageService.GetPlayerPreferences(player);
-            }
-            catch (Exception ex)
-            {
-                Server.NextFrame(() =>
-                {
-                    Server.PrintToConsole($"[SpectatorList] Error loading preferences for {player.PlayerName}: {ex.Message}");
-                });
-                return PlayerDisplayPreferences.FromDefaults(_config.Display);
-            }
-        }
-
         public bool CanPlayerViewList(CCSPlayerController player)
         {
             if (string.IsNullOrEmpty(_config.CanViewList))
@@ -123,26 +107,6 @@ namespace SpectatorList.Managers
                     Server.PrintToConsole($"[SpectatorList] Error toggling display for {playerName}: {errorMessage}");
                 });
 
-                return PlayerDisplayPreferences.FromDefaults(_config.Display);
-            }
-        }
-
-        public PlayerDisplayPreferences TogglePlayerDisplay(CCSPlayerController player)
-        {
-            try
-            {
-                var preferences = _storageService.TogglePlayerDisplay(player);
-
-                if (!preferences.Enabled)
-                {
-                    CleanupPlayerDisplay(player);
-                }
-
-                return preferences;
-            }
-            catch (Exception ex)
-            {
-                Server.PrintToConsole($"[SpectatorList] Error toggling display for {player.PlayerName}: {ex.Message}");
                 return PlayerDisplayPreferences.FromDefaults(_config.Display);
             }
         }

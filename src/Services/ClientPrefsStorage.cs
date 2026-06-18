@@ -70,7 +70,7 @@ namespace SpectatorList.Services
             return GetPlayerPreferences(player);
         }
 
-        public PlayerDisplayPreferences GetPlayerPreferences(CCSPlayerController player)
+        private PlayerDisplayPreferences GetPlayerPreferences(CCSPlayerController player)
         {
             var preferences = PlayerDisplayPreferences.FromDefaults(_defaults);
 
@@ -117,7 +117,7 @@ namespace SpectatorList.Services
             return TogglePlayerDisplay(player);
         }
 
-        public PlayerDisplayPreferences TogglePlayerDisplay(CCSPlayerController player)
+        private PlayerDisplayPreferences TogglePlayerDisplay(CCSPlayerController player)
         {
             var preferences = GetPlayerPreferences(player);
             preferences.Enabled = !preferences.Enabled;

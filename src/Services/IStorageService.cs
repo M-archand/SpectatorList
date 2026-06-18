@@ -7,9 +7,7 @@ namespace SpectatorList.Services
     {
         Task<bool> InitializeAsync();
         Task<PlayerDisplayPreferences> GetPlayerPreferencesAsync(CCSPlayerController player);
-        PlayerDisplayPreferences GetPlayerPreferences(CCSPlayerController player);
         Task<PlayerDisplayPreferences> TogglePlayerDisplayAsync(CCSPlayerController player);
-        PlayerDisplayPreferences TogglePlayerDisplay(CCSPlayerController player);
         Task SetPlayerPreferencesAsync(CCSPlayerController player, PlayerDisplayPreferences preferences);
         void OnPlayerDisconnect(CCSPlayerController player);
         void ClearCache();
