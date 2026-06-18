@@ -110,12 +110,8 @@ namespace SpectatorList.Display
 
         public void Dispose()
         {
-            if (_onTickHandler != null)
-            {
-                _onTickHandler = null;
-            }
-
             HideDisplay();
+            _onTickHandler = null;
         }
     }
 }
