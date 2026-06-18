@@ -22,6 +22,7 @@ namespace SpectatorList.Services
         private bool _databaseReady;
         private bool _eventsBound;
         private bool _registerScheduled;
+        private bool _registrationInProgress;
 
         public ClientPrefsStorage(SpectatorConfig config, IClientprefsApi? clientprefsApi)
         {
@@ -195,7 +196,7 @@ namespace SpectatorList.Services
         private void OnDatabaseLoaded()
         {
             _databaseReady = true;
-            Server.NextFrame(TryRegisterCookie);
+            Server.NextFrame(() => _ = TryRegisterCookieAsync());
         }
 
         private void OnPlayerCookiesCached(CCSPlayerController player)
@@ -266,11 +267,11 @@ namespace SpectatorList.Services
             Server.NextFrame(() =>
             {
                 _registerScheduled = false;
-                TryRegisterCookie();
+                _ = TryRegisterCookieAsync();
             });
         }
 
-        private void TryRegisterCookie()
+        private async Task TryRegisterCookieAsync()
         {
             if (_clientprefsApi == null || _cookieId != -1)
             {
@@ -278,10 +279,12 @@ namespace SpectatorList.Services
                 return;
             }
 
-            if (!_databaseReady)
+            if (!_databaseReady || _registrationInProgress)
             {
                 return;
             }
+
+            _registrationInProgress = true;
 
             try
             {
@@ -299,7 +302,7 @@ namespace SpectatorList.Services
                     return;
                 }
 
-                var cookieId = _clientprefsApi.RegPlayerCookie(CookieName, CookieDescription, CookieAccess.CookieAccess_Public);
+                var cookieId = await _clientprefsApi.RegPlayerCookieAsync(CookieName, CookieDescription, CookieAccess.CookieAccess_Public);
                 if (cookieId != -1)
                 {
                     _cookieId = cookieId;
@@ -310,11 +313,19 @@ namespace SpectatorList.Services
                         Server.PrintToConsole($"[SpectatorList] Clientprefs cookie id is {cookieId} (expected {ExpectedCookieId}).");
                     }
                 }
+                else
+                {
+                    _cookieReadyTcs.TrySetResult(false);
+                }
             }
             catch (Exception ex)
             {
                 Server.PrintToConsole($"[SpectatorList] Failed to register clientprefs cookie: {ex.Message}");
                 _cookieReadyTcs.TrySetResult(false);
+            }
+            finally
+            {
+                _registrationInProgress = false;
             }
         }
     }
