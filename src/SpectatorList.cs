@@ -17,12 +17,12 @@ using SpectatorList.Services;
 
 namespace SpectatorList;
 
-[MinimumApiVersion(342)]
+[MinimumApiVersion(369)]
 public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
 {
     public override string ModuleName => "SpectatorList";
-    public override string ModuleVersion => "1.0.5";
-    public override string ModuleAuthor => "luca.uy";
+    public override string ModuleVersion => "1.1.0";
+    public override string ModuleAuthor => "luca.uy, Marchand";
 
     public SpectatorConfig Config { get; set; } = new();
     private CounterStrikeSharp.API.Modules.Timers.Timer? _updateTimer;
@@ -161,7 +161,6 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
         var preferences = await _displayManager.GetPlayerPreferencesAsync(player);
 
         var menu = CreateMenu("Spectator List");
-        menu.MenuTime = 0;
 
         AddToggleMenuItem(menu, preferences);
         AddDisplayTypeMenuItem(menu);
@@ -275,7 +274,6 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
         var preferences = await _displayManager.GetPlayerPreferencesAsync(player);
 
         var menu = CreateMenu("Spectator List - Display Type", parentMenu);
-        menu.MenuTime = 0;
 
         ItemOption? chatOption = null;
         ItemOption? hudOption = null;
