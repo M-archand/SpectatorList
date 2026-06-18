@@ -191,8 +191,14 @@ namespace SpectatorList.Managers
             if (!canView)
                 return;
 
+            if (!player.IsValid)
+                return;
+
             var preferences = await GetPlayerPreferencesAsync(player);
             if (!preferences.Enabled)
+                return;
+
+            if (!player.IsValid)
                 return;
 
             var filteredSpectators = new List<CCSPlayerController>();
@@ -214,6 +220,9 @@ namespace SpectatorList.Managers
 
             filteredSpectators = await filterTask.Task;
 
+            if (!player.IsValid)
+                return;
+
             if (filteredSpectators.Count == 0)
             {
                 Server.NextFrame(() => CleanupPlayerDisplay(player));
@@ -224,6 +233,9 @@ namespace SpectatorList.Managers
             {
                 try
                 {
+                    if (!player.IsValid)
+                        return;
+
                     DisplayOnScreen(player, filteredSpectators, preferences);
                 }
                 catch (Exception ex)
