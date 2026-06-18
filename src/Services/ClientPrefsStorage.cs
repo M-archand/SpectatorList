@@ -10,7 +10,6 @@ namespace SpectatorList.Services
     {
         private const string CookieName = "spectatorlist_config";
         private const string CookieDescription = "JSON SpectatorList settings";
-        private const int ExpectedCookieId = 6;
 
         private readonly IClientprefsApi? _clientprefsApi;
         private readonly DisplaySettings _defaults;
@@ -293,12 +292,6 @@ namespace SpectatorList.Services
                 {
                     _cookieId = existingId;
                     _cookieReadyTcs.TrySetResult(true);
-
-                    if (existingId != ExpectedCookieId)
-                    {
-                        Server.PrintToConsole($"[SpectatorList] Clientprefs cookie id is {existingId} (expected {ExpectedCookieId}).");
-                    }
-
                     return;
                 }
 
@@ -307,11 +300,6 @@ namespace SpectatorList.Services
                 {
                     _cookieId = cookieId;
                     _cookieReadyTcs.TrySetResult(true);
-
-                    if (cookieId != ExpectedCookieId)
-                    {
-                        Server.PrintToConsole($"[SpectatorList] Clientprefs cookie id is {cookieId} (expected {ExpectedCookieId}).");
-                    }
                 }
                 else
                 {
