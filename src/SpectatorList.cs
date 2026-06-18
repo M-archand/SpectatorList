@@ -682,10 +682,13 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
         if (_displayManager == null) return;
 
         var alivePlayers = Utilities.GetPlayers().Where(p => p.IsValid && p.PawnIsAlive).ToList();
+        var spectatorMap = BuildSpectatorMap();
 
         foreach (var player in alivePlayers)
         {
-            var currentSpectators = GetPlayersSpectating(player);
+            if (!spectatorMap.TryGetValue(player.Slot, out var currentSpectators))
+                currentSpectators = new List<CCSPlayerController>();
+
             var currentSpectatorNames = currentSpectators.Select(s => s.PlayerName).ToList();
 
             bool hasChanged = false;
@@ -740,12 +743,12 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
             return;
 
         var alivePlayers = Utilities.GetPlayers().Where(p => p.IsValid && p.PawnIsAlive).ToList();
+        var spectatorMap = BuildSpectatorMap();
         var tasks = new List<Task>();
 
         foreach (var player in alivePlayers)
         {
-            var spectators = GetPlayersSpectating(player);
-            if (spectators.Count > 0)
+            if (spectatorMap.TryGetValue(player.Slot, out var spectators) && spectators.Count > 0)
             {
                 tasks.Add(_displayManager.DisplaySpectatorListAsync(player, spectators));
             }
@@ -821,6 +824,59 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
         return spectators;
     }
 
+    private static nint? GetObserverTargetHandle(CCSPlayerController player)
+    {
+        var playerPawnTarget = player.PlayerPawn?.Value?.ObserverServices?.ObserverTarget;
+        if (playerPawnTarget?.Value != null)
+            return playerPawnTarget.Value.Handle;
+
+        var observerPawnTarget = player.ObserverPawn?.Value?.ObserverServices?.ObserverTarget;
+        if (observerPawnTarget?.Value != null)
+            return observerPawnTarget.Value.Handle;
+
+        return null;
+    }
+
+    private Dictionary<int, List<CCSPlayerController>> BuildSpectatorMap()
+    {
+        var map = new Dictionary<int, List<CCSPlayerController>>();
+        var allPlayers = Utilities.GetPlayers();
+
+        var pawnHandleToTarget = new Dictionary<nint, CCSPlayerController>();
+        foreach (var player in allPlayers)
+        {
+            if (!player.IsValid || !player.PawnIsAlive)
+                continue;
+
+            var pawn = player.PlayerPawn?.Value;
+            if (pawn != null)
+                pawnHandleToTarget[pawn.Handle] = player;
+        }
+
+        foreach (var player in allPlayers)
+        {
+            if (!player.IsValid || player.TeamNum == 0 || player.PawnIsAlive)
+                continue;
+
+            var observerTargetHandle = GetObserverTargetHandle(player);
+            if (observerTargetHandle == null)
+                continue;
+
+            if (pawnHandleToTarget.TryGetValue(observerTargetHandle.Value, out var target) && target.Slot != player.Slot)
+            {
+                if (!map.TryGetValue(target.Slot, out var list))
+                {
+                    list = new List<CCSPlayerController>();
+                    map[target.Slot] = list;
+                }
+
+                list.Add(player);
+            }
+        }
+
+        return map;
+    }
+
     private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event, GameEventInfo info)
     {
         return HookResult.Continue;
@@ -885,11 +941,14 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
             }
         }
 
+        var spectatorMap = BuildSpectatorMap();
         var tasks = new List<Task>();
 
         foreach (var player in alivePlayers)
         {
-            var currentSpectators = GetPlayersSpectating(player);
+            if (!spectatorMap.TryGetValue(player.Slot, out var currentSpectators))
+                currentSpectators = new List<CCSPlayerController>();
+
             var currentSpectatorNames = currentSpectators.Select(s => s.PlayerName).ToList();
             var hasChanged = !_lastSpectatorLists.TryGetValue(player.Slot, out var lastList) ||
                              !currentSpectatorNames.SequenceEqual(lastList);
