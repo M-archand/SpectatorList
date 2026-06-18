@@ -73,7 +73,7 @@ namespace SpectatorList.Models
 
         public bool MatchesDefaults(DisplaySettings defaults)
         {
-            return Enabled &&
+            return Enabled == defaults.EnabledByDefault &&
                    SendToChat == defaults.SendToChat &&
                    UseCenterMessage == defaults.UseCenterMessage &&
                    UseScreenView == defaults.UseScreenView;
