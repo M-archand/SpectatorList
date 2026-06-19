@@ -703,8 +703,9 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
     {
         if (_displayManager == null) return;
 
-        var alivePlayers = Utilities.GetPlayers().Where(p => p.IsValid && p.PawnIsAlive).ToList();
-        var spectatorMap = BuildSpectatorMap();
+        var allPlayers = Utilities.GetPlayers();
+        var alivePlayers = allPlayers.Where(p => p.IsValid && p.PawnIsAlive).ToList();
+        var spectatorMap = BuildSpectatorMap(allPlayers);
 
         foreach (var player in alivePlayers)
         {
@@ -856,10 +857,9 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
         return null;
     }
 
-    private Dictionary<int, List<CCSPlayerController>> BuildSpectatorMap()
+    private Dictionary<int, List<CCSPlayerController>> BuildSpectatorMap(List<CCSPlayerController> allPlayers)
     {
         var map = new Dictionary<int, List<CCSPlayerController>>();
-        var allPlayers = Utilities.GetPlayers();
 
         var pawnHandleToTarget = new Dictionary<nint, CCSPlayerController>();
         foreach (var player in allPlayers)
@@ -945,10 +945,11 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
     {
         if (_displayManager == null) return;
 
-        var alivePlayers = Utilities.GetPlayers().Where(p => p.IsValid && p.PawnIsAlive).ToList();
-        var allPlayers = Utilities.GetPlayers().Where(p => p.IsValid).ToList();
+        var allPlayers = Utilities.GetPlayers();
+        var validPlayers = allPlayers.Where(p => p.IsValid).ToList();
+        var alivePlayers = validPlayers.Where(p => p.PawnIsAlive).ToList();
 
-        foreach (var player in allPlayers)
+        foreach (var player in validPlayers)
         {
             if (!player.PawnIsAlive)
             {
@@ -956,7 +957,7 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
             }
         }
 
-        var spectatorMap = BuildSpectatorMap();
+        var spectatorMap = BuildSpectatorMap(allPlayers);
         var tasks = new List<Task>();
 
         foreach (var player in alivePlayers)
