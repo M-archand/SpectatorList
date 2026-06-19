@@ -214,7 +214,7 @@ namespace SpectatorList.Managers
 
             lock (_displaysLock)
             {
-                CleanupPlayerDisplay(player);
+                CleanupPlayerDisplayCore(player);
 
                 if (preferences.UseCenterMessage)
                 {
@@ -289,17 +289,22 @@ namespace SpectatorList.Managers
         {
             lock (_displaysLock)
             {
-                if (_centerDisplays.TryGetValue(player.Slot, out var centerDisplay))
-                {
-                    centerDisplay.Dispose();
-                    _centerDisplays.Remove(player.Slot);
-                }
+                CleanupPlayerDisplayCore(player);
+            }
+        }
 
-                if (_screenDisplays.TryGetValue(player.Slot, out var screenDisplay))
-                {
-                    screenDisplay.Dispose();
-                    _screenDisplays.Remove(player.Slot);
-                }
+        private void CleanupPlayerDisplayCore(CCSPlayerController player)
+        {
+            if (_centerDisplays.TryGetValue(player.Slot, out var centerDisplay))
+            {
+                centerDisplay.Dispose();
+                _centerDisplays.Remove(player.Slot);
+            }
+
+            if (_screenDisplays.TryGetValue(player.Slot, out var screenDisplay))
+            {
+                screenDisplay.Dispose();
+                _screenDisplays.Remove(player.Slot);
             }
         }
 
