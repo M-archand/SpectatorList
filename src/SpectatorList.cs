@@ -27,6 +27,8 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
     public SpectatorConfig Config { get; set; } = new();
     private CounterStrikeSharp.API.Modules.Timers.Timer? _updateTimer;
     private Dictionary<int, List<string>> _lastSpectatorLists = new();
+    private readonly Dictionary<int, float> _lastCommandTime = new();
+    private const float CommandCooldownSeconds = 2.0f;
     private float _lastPeriodicFireTime = float.NegativeInfinity;
     private DisplayManager? _displayManager;
     private IClientprefsApi? _clientPrefsApi;
@@ -99,6 +101,7 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
     {
         _displayManager?.CleanupAllDisplays();
         _lastSpectatorLists.Clear();
+        _lastCommandTime.Clear();
         _lastPeriodicFireTime = float.NegativeInfinity;
     }
 
@@ -133,6 +136,14 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
     {
         if (player == null || !player.IsValid)
             return;
+
+        if (_lastCommandTime.TryGetValue(player.Slot, out var lastInvocation) &&
+            Server.CurrentTime - lastInvocation < CommandCooldownSeconds)
+        {
+            return;
+        }
+
+        _lastCommandTime[player.Slot] = Server.CurrentTime;
 
         if (!string.IsNullOrEmpty(Config.CommandPermissions) && !AdminManager.PlayerHasPermissions(player, Config.CommandPermissions))
         {
@@ -897,6 +908,7 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
         {
             _displayManager?.OnPlayerDisconnect(player);
             _lastSpectatorLists.Remove(player.Slot);
+            _lastCommandTime.Remove(player.Slot);
             Server.NextFrame(UpdateAllSpectatorLists);
         }
         return HookResult.Continue;
