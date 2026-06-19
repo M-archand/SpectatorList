@@ -91,6 +91,15 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
         RegisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
         RegisterEventHandler<EventPlayerDeath>(OnPlayerDeath);
         RegisterEventHandler<EventPlayerTeam>(OnPlayerTeam);
+
+        RegisterListener<Listeners.OnMapStart>(OnMapStart);
+    }
+
+    private void OnMapStart(string mapName)
+    {
+        _displayManager?.CleanupAllDisplays();
+        _lastSpectatorLists.Clear();
+        _lastPeriodicFireTime = float.NegativeInfinity;
     }
 
     public override void OnAllPluginsLoaded(bool hotReload)
