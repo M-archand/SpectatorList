@@ -484,7 +484,7 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
         });
     }
 
-    private async Task HandleToggleCommand(CCSPlayerController player, CommandInfo commandInfo)
+    private async Task HandleToggleCommand(CCSPlayerController player)
     {
         try
         {
@@ -555,26 +555,27 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
 
     private async Task HandlePreferenceCommand(CCSPlayerController player, CommandInfo commandInfo)
     {
+        if (_displayManager == null)
+        {
+            commandInfo.ReplyToCommand($"{Localizer["prefix"]} Display manager not initialized");
+            return;
+        }
+
+        var argCount = commandInfo.ArgCount;
+        var action = argCount > 1 ? commandInfo.GetArg(1).ToLowerInvariant() : string.Empty;
+        bool? explicitValue = null;
+
+        if (argCount > 2 && TryParsePreferenceValue(commandInfo.GetArg(2), out var parsedValue))
+        {
+            explicitValue = parsedValue;
+        }
+
         try
         {
-            if (_displayManager == null)
+            if (argCount <= 1)
             {
-                commandInfo.ReplyToCommand($"{Localizer["prefix"]} Display manager not initialized");
+                await HandleToggleCommand(player);
                 return;
-            }
-
-            if (commandInfo.ArgCount <= 1)
-            {
-                await HandleToggleCommand(player, commandInfo);
-                return;
-            }
-
-            var action = commandInfo.GetArg(1).ToLowerInvariant();
-            bool? explicitValue = null;
-
-            if (commandInfo.ArgCount > 2 && TryParsePreferenceValue(commandInfo.GetArg(2), out var parsedValue))
-            {
-                explicitValue = parsedValue;
             }
 
             PlayerDisplayPreferences? updatedPreferences = null;
@@ -621,7 +622,7 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
                     break;
 
                 default:
-                    await HandleToggleCommand(player, commandInfo);
+                    await HandleToggleCommand(player);
                     return;
             }
 
