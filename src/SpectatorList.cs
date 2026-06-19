@@ -89,7 +89,6 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
         RegisterEventHandler<EventPlayerDisconnect>(OnPlayerDisconnect);
         RegisterEventHandler<EventRoundEnd>(OnRoundEnd);
         RegisterEventHandler<EventRoundStart>(OnRoundStart);
-        RegisterEventHandler<EventPlayerConnectFull>(OnPlayerConnectFull);
         RegisterEventHandler<EventPlayerSpawn>(OnPlayerSpawn);
         RegisterEventHandler<EventPlayerDeath>(OnPlayerDeath);
         RegisterEventHandler<EventPlayerTeam>(OnPlayerTeam);
@@ -894,11 +893,6 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
         }
 
         return map;
-    }
-
-    private HookResult OnPlayerConnectFull(EventPlayerConnectFull @event, GameEventInfo info)
-    {
-        return HookResult.Continue;
     }
 
     private HookResult OnPlayerDisconnect(EventPlayerDisconnect @event, GameEventInfo info)
