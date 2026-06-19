@@ -758,8 +758,13 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
     {
         if (_displayManager == null) return;
 
-        if (Server.CurrentTime >= _lastPeriodicFireTime &&
-            Server.CurrentTime - _lastPeriodicFireTime < Config.Update.PeriodicInterval)
+        if (float.IsNegativeInfinity(_lastPeriodicFireTime))
+        {
+            _lastPeriodicFireTime = Server.CurrentTime;
+            return;
+        }
+
+        if (Server.CurrentTime - _lastPeriodicFireTime < Config.Update.PeriodicInterval)
             return;
 
         _lastPeriodicFireTime = Server.CurrentTime;
