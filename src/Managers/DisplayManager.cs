@@ -171,64 +171,14 @@ namespace SpectatorList.Managers
             if (!player.IsValid || spectators == null)
                 return;
 
-            bool canView = false;
-            var canViewTask = new TaskCompletionSource<bool>();
-
-            Server.NextFrame(() =>
-            {
-                try
-                {
-                    canView = CanPlayerViewList(player);
-                    canViewTask.SetResult(canView);
-                }
-                catch (Exception ex)
-                {
-                    Server.PrintToConsole($"[SpectatorList] Error checking view permissions: {ex.Message}");
-                    canViewTask.SetResult(false);
-                }
-            });
-
-            canView = await canViewTask.Task;
-            if (!canView)
+            if (!CanPlayerViewList(player))
                 return;
 
-            if (!player.IsValid)
-                return;
+            var filteredSpectators = FilterSpectators(spectators);
 
             var preferences = await GetPlayerPreferencesAsync(player);
             if (!preferences.Enabled)
                 return;
-
-            if (!player.IsValid)
-                return;
-
-            var filteredSpectators = new List<CCSPlayerController>();
-            var filterTask = new TaskCompletionSource<List<CCSPlayerController>>();
-
-            Server.NextFrame(() =>
-            {
-                try
-                {
-                    filteredSpectators = FilterSpectators(spectators);
-                    filterTask.SetResult(filteredSpectators);
-                }
-                catch (Exception ex)
-                {
-                    Server.PrintToConsole($"[SpectatorList] Error filtering spectators: {ex.Message}");
-                    filterTask.SetResult(new List<CCSPlayerController>());
-                }
-            });
-
-            filteredSpectators = await filterTask.Task;
-
-            if (!player.IsValid)
-                return;
-
-            if (filteredSpectators.Count == 0)
-            {
-                Server.NextFrame(() => CleanupPlayerDisplay(player));
-                return;
-            }
 
             Server.NextFrame(() =>
             {
@@ -236,6 +186,12 @@ namespace SpectatorList.Managers
                 {
                     if (!player.IsValid)
                         return;
+
+                    if (filteredSpectators.Count == 0)
+                    {
+                        CleanupPlayerDisplay(player);
+                        return;
+                    }
 
                     DisplayOnScreen(player, filteredSpectators, preferences);
                 }
