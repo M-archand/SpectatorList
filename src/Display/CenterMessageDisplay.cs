@@ -12,7 +12,6 @@ namespace SpectatorList.Display
         private readonly BasePlugin _plugin;
         private bool _isDisplaying = false;
         private string? _currentMessage;
-        private Listeners.OnTick? _onTickHandler;
 
         public CenterMessageDisplay(CCSPlayerController player, SpectatorConfig config, BasePlugin plugin)
         {
@@ -29,13 +28,7 @@ namespace SpectatorList.Display
             try
             {
                 _currentMessage = BuildMessage(spectators);
-
-                if (!_isDisplaying)
-                {
-                    _onTickHandler = OnTickUpdate;
-                    _plugin.RegisterListener(_onTickHandler);
-                    _isDisplaying = true;
-                }
+                _isDisplaying = true;
             }
             catch (Exception ex)
             {
@@ -43,7 +36,7 @@ namespace SpectatorList.Display
             }
         }
 
-        private void OnTickUpdate()
+        public void Render()
         {
             if (!_isDisplaying || !_player.IsValid || string.IsNullOrEmpty(_currentMessage))
                 return;
@@ -88,30 +81,13 @@ namespace SpectatorList.Display
 
         public void HideDisplay()
         {
-            if (!_isDisplaying)
-                return;
-
-            try
-            {
-                if (_onTickHandler != null)
-                {
-                    _plugin.RemoveListener(_onTickHandler);
-                    _onTickHandler = null;
-                }
-
-                _currentMessage = null;
-                _isDisplaying = false;
-            }
-            catch (Exception ex)
-            {
-                Server.PrintToConsole($"[SpectatorList] Error hiding center message: {ex.Message}");
-            }
+            _currentMessage = null;
+            _isDisplaying = false;
         }
 
         public void Dispose()
         {
             HideDisplay();
-            _onTickHandler = null;
         }
     }
 }

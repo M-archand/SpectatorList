@@ -17,6 +17,7 @@ namespace SpectatorList.Managers
         private readonly SpectatorConfig _config;
         private readonly BasePlugin _plugin;
         private readonly IStorageService _storageService;
+        private readonly Listeners.OnTick _centerTickHandler;
 
         public DisplayManager(SpectatorConfig config, BasePlugin plugin, IStorageService storageService)
         {
@@ -26,7 +27,21 @@ namespace SpectatorList.Managers
             _centerDisplays = new Dictionary<int, CenterMessageDisplay>();
             _screenDisplays = new Dictionary<int, ScreenViewDisplay>();
 
+            _centerTickHandler = OnCenterTick;
+            _plugin.RegisterListener(_centerTickHandler);
+
             Server.NextFrame(() => _ = InitializeStorageAsync());
+        }
+
+        private void OnCenterTick()
+        {
+            lock (_displaysLock)
+            {
+                foreach (var display in _centerDisplays.Values)
+                {
+                    display.Render();
+                }
+            }
         }
 
         private async Task InitializeStorageAsync()
@@ -350,6 +365,7 @@ namespace SpectatorList.Managers
 
         public void Dispose()
         {
+            _plugin.RemoveListener(_centerTickHandler);
             CleanupAllDisplays();
             _storageService.ClearCache();
         }
