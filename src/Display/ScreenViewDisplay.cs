@@ -84,6 +84,9 @@ namespace SpectatorList.Display
             if (pawn == null)
                 return null;
 
+            if (pawn.AbsOrigin == null)
+                return null;
+
             CPointOrient? entOrient = Utilities.CreateEntityByName<CPointOrient>("point_orient");
             if (entOrient == null || !entOrient.IsValid)
                 return null;
@@ -93,9 +96,9 @@ namespace SpectatorList.Display
             entOrient.DispatchSpawn();
 
             Vector vecPos = new Vector(
-                pawn.AbsOrigin!.X,
-                pawn.AbsOrigin!.Y,
-                pawn.AbsOrigin!.Z + pawn.ViewOffset.Z
+                pawn.AbsOrigin.X,
+                pawn.AbsOrigin.Y,
+                pawn.AbsOrigin.Z + pawn.ViewOffset.Z
             );
             entOrient.Teleport(vecPos, null, null);
             entOrient.AcceptInput("SetParent", pawn, null, "!activator");
