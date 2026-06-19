@@ -13,6 +13,7 @@ namespace SpectatorList.Managers
     {
         private readonly Dictionary<int, CenterMessageDisplay> _centerDisplays;
         private readonly Dictionary<int, ScreenViewDisplay> _screenDisplays;
+        private readonly object _displaysLock = new();
         private readonly SpectatorConfig _config;
         private readonly BasePlugin _plugin;
         private readonly IStorageService _storageService;
@@ -255,20 +256,23 @@ namespace SpectatorList.Managers
             if (spectators.Count == 0)
                 return;
 
-            CleanupPlayerDisplay(player);
-
-            if (preferences.UseCenterMessage)
+            lock (_displaysLock)
             {
-                var centerDisplay = new CenterMessageDisplay(player, _config, _plugin);
-                _centerDisplays[player.Slot] = centerDisplay;
-                centerDisplay.ShowSpectatorList(spectators);
-            }
+                CleanupPlayerDisplay(player);
 
-            if (preferences.UseScreenView)
-            {
-                var screenDisplay = new ScreenViewDisplay(player, _config, _plugin);
-                _screenDisplays[player.Slot] = screenDisplay;
-                screenDisplay.ShowSpectatorList(spectators);
+                if (preferences.UseCenterMessage)
+                {
+                    var centerDisplay = new CenterMessageDisplay(player, _config, _plugin);
+                    _centerDisplays[player.Slot] = centerDisplay;
+                    centerDisplay.ShowSpectatorList(spectators);
+                }
+
+                if (preferences.UseScreenView)
+                {
+                    var screenDisplay = new ScreenViewDisplay(player, _config, _plugin);
+                    _screenDisplays[player.Slot] = screenDisplay;
+                    screenDisplay.ShowSpectatorList(spectators);
+                }
             }
 
             if (preferences.SendToChat)
@@ -327,44 +331,53 @@ namespace SpectatorList.Managers
 
         public void CleanupPlayerDisplay(CCSPlayerController player)
         {
-            if (_centerDisplays.TryGetValue(player.Slot, out var centerDisplay))
+            lock (_displaysLock)
             {
-                centerDisplay.Dispose();
-                _centerDisplays.Remove(player.Slot);
-            }
+                if (_centerDisplays.TryGetValue(player.Slot, out var centerDisplay))
+                {
+                    centerDisplay.Dispose();
+                    _centerDisplays.Remove(player.Slot);
+                }
 
-            if (_screenDisplays.TryGetValue(player.Slot, out var screenDisplay))
-            {
-                screenDisplay.Dispose();
-                _screenDisplays.Remove(player.Slot);
+                if (_screenDisplays.TryGetValue(player.Slot, out var screenDisplay))
+                {
+                    screenDisplay.Dispose();
+                    _screenDisplays.Remove(player.Slot);
+                }
             }
         }
 
         public void CleanupAllDisplays()
         {
-            foreach (var display in _centerDisplays.Values)
+            lock (_displaysLock)
             {
-                display.Dispose();
-            }
-            _centerDisplays.Clear();
+                foreach (var display in _centerDisplays.Values)
+                {
+                    display.Dispose();
+                }
+                _centerDisplays.Clear();
 
-            foreach (var display in _screenDisplays.Values)
-            {
-                display.Dispose();
+                foreach (var display in _screenDisplays.Values)
+                {
+                    display.Dispose();
+                }
+                _screenDisplays.Clear();
             }
-            _screenDisplays.Clear();
         }
 
         public void HidePlayerDisplay(CCSPlayerController player)
         {
-            if (_centerDisplays.TryGetValue(player.Slot, out var centerDisplay))
+            lock (_displaysLock)
             {
-                centerDisplay.HideDisplay();
-            }
+                if (_centerDisplays.TryGetValue(player.Slot, out var centerDisplay))
+                {
+                    centerDisplay.HideDisplay();
+                }
 
-            if (_screenDisplays.TryGetValue(player.Slot, out var screenDisplay))
-            {
-                screenDisplay.HideDisplay();
+                if (_screenDisplays.TryGetValue(player.Slot, out var screenDisplay))
+                {
+                    screenDisplay.HideDisplay();
+                }
             }
         }
 
