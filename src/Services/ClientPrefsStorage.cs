@@ -15,7 +15,6 @@ namespace SpectatorList.Services
         private readonly DisplaySettings _defaults;
         private readonly Dictionary<string, PlayerDisplayPreferences> _preferenceCache;
         private readonly HashSet<string> _playersWithStoredPrefs;
-        private readonly TaskCompletionSource<bool> _cookieReadyTcs;
 
         private int _cookieId = -1;
         private bool _databaseReady;
@@ -29,17 +28,12 @@ namespace SpectatorList.Services
             _defaults = config.Display;
             _preferenceCache = new Dictionary<string, PlayerDisplayPreferences>();
             _playersWithStoredPrefs = new HashSet<string>();
-            _cookieReadyTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             if (_clientprefsApi != null)
             {
                 _clientprefsApi.OnDatabaseLoaded += OnDatabaseLoaded;
                 _clientprefsApi.OnPlayerCookiesCached += OnPlayerCookiesCached;
                 _eventsBound = true;
-            }
-            else
-            {
-                _cookieReadyTcs.TrySetResult(false);
             }
         }
 
@@ -232,24 +226,30 @@ namespace SpectatorList.Services
                 return true;
             }
 
-            ScheduleRegisterCookie();
-
-            if (_cookieId != -1)
+            if (_clientprefsApi == null)
             {
-                return true;
+                return false;
             }
 
-            try
+            const int maxAttempts = 50;
+
+            for (var attempt = 0; attempt < maxAttempts; attempt++)
             {
-                var completed = await Task.WhenAny(_cookieReadyTcs.Task, Task.Delay(TimeSpan.FromSeconds(5)));
-                if (completed == _cookieReadyTcs.Task)
+                ScheduleRegisterCookie();
+
+                if (_cookieId != -1)
                 {
-                    return _cookieId != -1 && _cookieReadyTcs.Task.Result;
+                    return true;
                 }
-            }
-            catch
-            {
-                // Ignored - fallback to defaults.
+
+                try
+                {
+                    await Task.Delay(TimeSpan.FromMilliseconds(100));
+                }
+                catch
+                {
+                    break;
+                }
             }
 
             return _cookieId != -1;
@@ -274,7 +274,6 @@ namespace SpectatorList.Services
         {
             if (_clientprefsApi == null || _cookieId != -1)
             {
-                _cookieReadyTcs.TrySetResult(_cookieId != -1);
                 return;
             }
 
@@ -291,7 +290,6 @@ namespace SpectatorList.Services
                 if (existingId != -1)
                 {
                     _cookieId = existingId;
-                    _cookieReadyTcs.TrySetResult(true);
                     return;
                 }
 
@@ -299,17 +297,11 @@ namespace SpectatorList.Services
                 if (cookieId != -1)
                 {
                     _cookieId = cookieId;
-                    _cookieReadyTcs.TrySetResult(true);
-                }
-                else
-                {
-                    _cookieReadyTcs.TrySetResult(false);
                 }
             }
             catch (Exception ex)
             {
                 Server.PrintToConsole($"[SpectatorList] Failed to register clientprefs cookie: {ex.Message}");
-                _cookieReadyTcs.TrySetResult(false);
             }
             finally
             {
