@@ -710,7 +710,8 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
             if (!spectatorMap.TryGetValue(player.Slot, out var currentSpectators))
                 currentSpectators = new List<CCSPlayerController>();
 
-            var currentSpectatorNames = currentSpectators.Select(s => s.PlayerName).ToList();
+            var filteredSpectators = _displayManager.FilterSpectators(currentSpectators);
+            var currentSpectatorNames = filteredSpectators.Select(s => s.PlayerName).ToList();
 
             bool hasChanged = false;
             if (_lastSpectatorLists.ContainsKey(player.Slot))
@@ -727,9 +728,9 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
 
             if (hasChanged && Config.Update.ShowOnChange)
             {
-                if (currentSpectators.Count > 0)
+                if (filteredSpectators.Count > 0)
                 {
-                    _ = _displayManager.DisplaySpectatorListAsync(player, currentSpectators);
+                    _ = _displayManager.DisplaySpectatorListAsync(player, filteredSpectators);
                 }
                 else
                 {
@@ -962,13 +963,14 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
             if (!spectatorMap.TryGetValue(player.Slot, out var currentSpectators))
                 currentSpectators = new List<CCSPlayerController>();
 
-            var currentSpectatorNames = currentSpectators.Select(s => s.PlayerName).ToList();
+            var filteredSpectators = _displayManager.FilterSpectators(currentSpectators);
+            var currentSpectatorNames = filteredSpectators.Select(s => s.PlayerName).ToList();
             var hasChanged = !_lastSpectatorLists.TryGetValue(player.Slot, out var lastList) ||
                              !currentSpectatorNames.SequenceEqual(lastList);
 
-            if (currentSpectators.Count > 0 && hasChanged)
+            if (filteredSpectators.Count > 0 && hasChanged)
             {
-                tasks.Add(_displayManager.DisplaySpectatorListAsync(player, currentSpectators));
+                tasks.Add(_displayManager.DisplaySpectatorListAsync(player, filteredSpectators));
             }
             else
             {
