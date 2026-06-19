@@ -41,6 +41,7 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
         {
             InitializeStorage();
         }
+        StartUpdateTimer();
     }
 
     private void InitializeStorage()
