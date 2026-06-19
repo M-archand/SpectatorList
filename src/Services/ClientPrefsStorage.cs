@@ -15,6 +15,7 @@ namespace SpectatorList.Services
         private readonly DisplaySettings _defaults;
         private readonly Dictionary<string, PlayerDisplayPreferences> _preferenceCache;
         private readonly HashSet<string> _playersWithStoredPrefs;
+        private readonly TaskCompletionSource<bool> _cookieReadyTcs = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         private int _cookieId = -1;
         private bool _databaseReady;
@@ -231,28 +232,10 @@ namespace SpectatorList.Services
                 return false;
             }
 
-            const int maxAttempts = 50;
+            ScheduleRegisterCookie();
 
-            for (var attempt = 0; attempt < maxAttempts; attempt++)
-            {
-                ScheduleRegisterCookie();
-
-                if (_cookieId != -1)
-                {
-                    return true;
-                }
-
-                try
-                {
-                    await Task.Delay(TimeSpan.FromMilliseconds(100));
-                }
-                catch
-                {
-                    break;
-                }
-            }
-
-            return _cookieId != -1;
+            var completed = await Task.WhenAny(_cookieReadyTcs.Task, Task.Delay(TimeSpan.FromSeconds(5)));
+            return completed == _cookieReadyTcs.Task && _cookieId != -1;
         }
 
         private void ScheduleRegisterCookie()
@@ -306,6 +289,11 @@ namespace SpectatorList.Services
             finally
             {
                 _registrationInProgress = false;
+
+                if (_cookieId != -1)
+                {
+                    _cookieReadyTcs.TrySetResult(true);
+                }
             }
         }
     }
