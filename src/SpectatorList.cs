@@ -746,11 +746,11 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
 
         if (Config.Update.ShowPeriodic)
         {
-            _ = ShowPeriodicSpectatorLists();
+            _ = ShowPeriodicSpectatorLists(alivePlayers, spectatorMap);
         }
     }
 
-    private async Task ShowPeriodicSpectatorLists()
+    private async Task ShowPeriodicSpectatorLists(List<CCSPlayerController> alivePlayers, Dictionary<int, List<CCSPlayerController>> spectatorMap)
     {
         if (_displayManager == null) return;
 
@@ -760,8 +760,6 @@ public class SpectatorList : BasePlugin, IPluginConfig<SpectatorConfig>
 
         _lastPeriodicFireTime = Server.CurrentTime;
 
-        var alivePlayers = Utilities.GetPlayers().Where(p => p.IsValid && p.PawnIsAlive).ToList();
-        var spectatorMap = BuildSpectatorMap();
         var tasks = new List<Task>();
 
         foreach (var player in alivePlayers)
